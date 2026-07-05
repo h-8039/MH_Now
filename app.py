@@ -129,14 +129,28 @@ def main():
         with st.spinner("ツリーを計算中…"):
             tree = GearTree(max_star, sel_wtype)
             tree.run(loadout)
+        # 折りたたみ操作等の再実行でツリーが消えないよう結果を保持する
+        st.session_state["tree_result"] = {
+            "sections": tree.sections,
+            "set_md": "\n".join(tree.set_md),
+            "full_md": "\n".join(tree.md),
+            "max_star": max_star,
+        }
 
-        st.subheader("📋 準備ツリー")
-        st.caption("🎯目標装備 ⚒作成する対策装備 🔴要対策モンスター "
-                   f"🟢★{max_star}以下（そのまま狩れる） 🔁前述")
-        st.markdown("\n".join(tree.md))
+    result = st.session_state.get("tree_result")
+    if result:
+        st.subheader("📋 準備ツリー（製作しやすい順）")
+        st.caption("🎯目標装備 ⚒対策装備セット 🔴要対策モンスター "
+                   f"🟢★{result['max_star']}以下（そのまま狩れる） 🔁前述 "
+                   "／ セットの内容は下の一覧を参照")
+        for sec in result["sections"]:
+            with st.expander(sec["title"]):
+                st.markdown("\n".join(sec["md"]))
+
+        st.markdown(result["set_md"])
 
         st.download_button("Markdownをダウンロード",
-                           data="\n".join(tree.md),
+                           data=result["full_md"],
                            file_name="gear_tree.md",
                            mime="text/markdown",
                            use_container_width=True)

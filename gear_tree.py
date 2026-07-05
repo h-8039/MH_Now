@@ -58,9 +58,12 @@ class GearTree:
         self.mat_src = json.loads(MAT_SRC_FILE.read_text(encoding="utf-8"))
         self.effects = load_skill_effects()
         self.visited = {}   # モンスター名 → 展開済みか
-        self.lines = []     # 出力バッファ（テキスト）
-        self.md = []        # 出力バッファ（Markdown）
+        self.lines = []     # 出力バッファ（コンソール用テキスト）
+        self.md = []        # 出力バッファ（Markdown全体・ファイル/DL用）
         self.sets = {}      # 装備セット(タプル) → {"gear": [...], "targets": [モンスター...]}
+        self.set_no = {}    # 装備セット(タプル) → セット番号（登場順=作成順）
+        self.sections = []  # [{"title": 装備見出し, "md": [ツリー行...]}] 折りたたみ表示用
+        self.set_md = []    # 装備セット一覧のMarkdown行
 
     # ------------------------------------------------ ① 素材→モンスター ---
 
@@ -130,86 +133,123 @@ class GearTree:
 
     # ---------------------------------------------------- ③ 再帰でツリー ---
 
-    def emit(self, indent, text, md_text=None):
+    def emit(self, buf, indent, text):
         self.lines.append("  " * indent + text)
-        self.md.append("  " * indent + "- " + (md_text or text))
+        buf.append("  " * indent + "- " + text)
 
-    def expand_monster(self, mon, indent, depth):
+    def set_label(self, key):
+        """ツリー内での装備セットの簡潔表示（セット番号＋属性のみ）。"""
+        el = self.sets[key]["gear"][0]["element"] or "無"
+        return f"セット{self.set_no[key]}（{el}属性）"
+
+    def expand_monster(self, mon, indent, depth, buf):
         star = self.min_star(mon)
         stars_s = self.monsters[mon].get("stars", "★?")
         weak_s = "・".join(self.monsters[mon]["weakness"])
         if star <= self.max_star:
-            self.emit(indent, f"🟢 {mon}（{stars_s}／弱点:{weak_s}）"
-                              f"→ ★{self.max_star}以下: 手持ち装備で討伐可能")
+            self.emit(buf, indent, f"🟢 {mon}（{stars_s}／弱点:{weak_s}）"
+                                   f"→ そのまま討伐可能")
             return
         if self.visited.get(mon):
-            self.emit(indent, f"🔁 {mon}（{stars_s}）→ 対策装備は前述")
+            self.emit(buf, indent, f"🔁 {mon}（{stars_s}）→ 前述のセットで討伐")
             return
         self.visited[mon] = True
-        self.emit(indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）→ 対策装備を作成:")
         if depth >= MAX_DEPTH:
-            self.emit(indent + 1, "…（深さ上限）")
+            self.emit(buf, indent, f"🔴 {mon}（{stars_s}）…（深さ上限）")
             return
         gear = self.select_set(mon)
         if not gear:
-            self.emit(indent + 1, f"⚠ ★{star}未満の素材で作れる適合武器なし"
-                                  f"（汎用素材装備で挑戦）")
+            self.emit(buf, indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）"
+                                   f"→ ⚠ ★{star}未満の素材で作れる適合武器なし"
+                                   f"（汎用素材装備で挑戦）")
             return
-        # 装備セットを登録（同一セットは討伐対象モンスターを追記）
+        # 装備セットを登録（初出時にセット番号を採番。同一セットは討伐対象を追記）
         key = tuple(g["name"] for g in gear)
+        first = key not in self.set_no
+        if first:
+            self.set_no[key] = len(self.set_no) + 1
         entry = self.sets.setdefault(key, {"gear": gear, "targets": []})
         entry["targets"].append(mon)
+        label = self.set_label(key)
+        if not first:
+            self.emit(buf, indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）"
+                                   f"→ ⚒ {label}で討伐（作成済み）")
+            return
+        self.emit(buf, indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）"
+                               f"→ ⚒ {label}を作成して討伐:")
+        need = set()
         for eq in gear:
-            slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
-            info = []
-            if eq["category"] == "武器":
-                el = eq["element"] or "無"
-                info.append(f"攻撃{eq['attack']}／{el}"
-                            + (str(eq["elem_value"]) if el != "無" else ""))
-            sk = "、".join(f"{k}Lv{v}" for k, v in list(eq["skills"].items())[:3])
-            if sk:
-                info.append(sk)
-            self.emit(indent + 1, f"⚒ 【{slot}】{eq['name']}（{'／'.join(info)}）")
-            need = sorted(self.monsters_for(eq["name"]), key=self.min_star)
-            for m in need:
-                self.expand_monster(m, indent + 2, depth + 1)
+            need |= self.monsters_for(eq["name"])
+        for m in sorted(need, key=self.min_star):
+            self.expand_monster(m, indent + 1, depth + 1, buf)
+
+    def difficulty(self, name):
+        """装備の製作難易度 = 必要モンスターの最大討伐難易度。"""
+        return max((self.min_star(m) for m in self.monsters_for(name)), default=0)
 
     def run(self, loadout):
-        self.emit(0, f"■ 目標装備（討伐難易度★{self.max_star}以下まで遡る）")
         all_targets = set()
+        # 製作しやすい順（必要討伐難易度が低い順）に装備ごとのツリーを作る
         for name in loadout:
             if name not in self.equipment:
                 sys.exit(f"エラー: 「{name}」はデータ未登録です。")
+        for name in sorted(loadout, key=self.difficulty):
             eq = self.equipment[name]
             slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
-            self.emit(1, f"🎯 【{slot}】{name}")
+            d = self.difficulty(name)
+            title = (f"🎯 【{slot}】{name}"
+                     f"（必要討伐難易度 {'★' + str(d) if d else '情報なし'}）")
+            self.lines.append(title)
+            buf = []
             need = sorted(self.monsters_for(name), key=self.min_star)
             all_targets.update(need)
             for m in need:
-                self.expand_monster(m, 2, 1)
-        self.emit_set_list(loadout)
+                self.expand_monster(m, 1, 1, buf)
+            if not buf:
+                self.emit(buf, 1, "（必要モンスター情報なし）")
+            self.sections.append({"title": title, "md": buf})
+        self.build_set_list(loadout)
+        self.build_md(loadout)
         return all_targets
 
-    def emit_set_list(self, loadout):
-        """ツリー末尾に、重複を除いた装備セット一覧を出力する。"""
-        self.emit(0, "")
-        self.emit(0, f"■ 装備セット一覧（重複除去・全{len(self.sets) + 1}セット）")
-        # 対策セットは「討伐対象の最大難易度が低い順」= 作る順に並べる
-        ordered = sorted(self.sets.values(),
-                         key=lambda e: max(self.min_star(m) for m in e["targets"]))
-        for i, entry in enumerate(ordered, 1):
+    def build_set_list(self, loadout):
+        """重複を除いた装備セット一覧（番号順=作成順）をMarkdown行で作る。"""
+        out = [f"### 📦 装備セット一覧（全{len(self.sets) + 1}セット・番号順に作成）"]
+        ordered = sorted(self.sets.items(), key=lambda kv: self.set_no[kv[0]])
+        for key, entry in ordered:
             targets = "、".join(
                 f"{m}（{self.monsters[m].get('stars', '★?')}）" for m in entry["targets"])
-            self.emit(1, f"セット{i}: 討伐対象 → {targets}")
+            out.append(f"- **{self.set_label(key)}** 討伐対象 → {targets}")
             for eq in entry["gear"]:
                 slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
+                info = []
+                if eq["category"] == "武器":
+                    el = eq["element"] or "無"
+                    info.append(f"攻撃{eq['attack']}／{el}"
+                                + (str(eq["elem_value"]) if el != "無" else ""))
                 sk = "、".join(f"{k}Lv{v}" for k, v in list(eq["skills"].items())[:3])
-                self.emit(2, f"【{slot}】{eq['name']}" + (f"（{sk}）" if sk else ""))
-        self.emit(1, f"最終セット: 目標装備")
+                if sk:
+                    info.append(sk)
+                out.append(f"  - 【{slot}】{eq['name']}"
+                           + (f"（{'／'.join(info)}）" if info else ""))
+        out.append("- **最終セット（目標装備）**")
         for name in loadout:
             eq = self.equipment[name]
             slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
-            self.emit(2, f"【{slot}】{name}")
+            out.append(f"  - 【{slot}】{name}")
+        self.set_md = out
+        self.lines.append("")
+        self.lines.extend(s.replace("**", "") for s in out)
+
+    def build_md(self, loadout):
+        """ファイル/ダウンロード用のMarkdown全体（<details>折りたたみ付き）を組み立てる。"""
+        md = [f"## 🌲 準備ツリー（製作しやすい順・討伐難易度★{self.max_star}以下まで遡り）", ""]
+        for sec in self.sections:
+            md += ["<details>", f"<summary>{sec['title']}</summary>", ""]
+            md += sec["md"]
+            md += ["", "</details>", ""]
+        md += self.set_md
+        self.md = md
 
 
 def main():
