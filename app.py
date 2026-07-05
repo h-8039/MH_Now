@@ -30,17 +30,43 @@ DEFAULT_LOADOUT = {
 }
 
 
-def ensure_db():
-    """クラウド環境などDBが無い場合、CSVから自動構築する。"""
+def db_ready():
+    """DBが存在し、装備データが入っているかを確認する。
+
+    ファイルの有無だけでは不十分（構築途中でプロセスが再起動されると
+    空のDBファイルが残るため、中身まで検証する）。
+    """
     if not DB_FILE.exists():
-        with st.spinner("初回起動: データベースを構築しています…（1〜2分）"):
-            import build_db
-            build_db.main()
+        return False
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        n = conn.execute("SELECT COUNT(*) FROM equipment").fetchone()[0]
+        conn.close()
+        return n > 0
+    except sqlite3.Error:
+        return False
+
+
+def ensure_db():
+    """クラウド環境などDBが無い/壊れている場合、CSVから自動構築する。"""
+    if db_ready():
+        return
+    with st.spinner("初回起動: データベースを構築しています…（1〜2分）"):
+        import build_db
+        build_db.main()
+    if not db_ready():
+        st.error("データベースの構築に失敗しました。raw_pages のCSVが"
+                 "リポジトリに含まれているか確認してください。")
+        st.stop()
+    load_choices.clear()  # 空リストがキャッシュされていた場合に備える
 
 
 @st.cache_data
-def load_choices():
-    """選択肢（武器種→武器、部位→防具）を読み込む。"""
+def load_choices(db_version: float = 0.0):
+    """選択肢（武器種→武器、部位→防具）を読み込む。
+
+    db_version はDB再構築後にキャッシュを無効化するためのキー。
+    """
     conn = sqlite3.connect(DB_FILE)
     weapons = {}
     for wtype, name in conn.execute(
@@ -65,7 +91,10 @@ def main():
                "「何を狩り、何を作るか」の準備ツリーを表示します。")
 
     ensure_db()
-    wtypes, weapons, armors = load_choices()
+    wtypes, weapons, armors = load_choices(DB_FILE.stat().st_mtime)
+    if not wtypes:
+        st.error("装備データが読み込めませんでした。ページを再読み込みしてください。")
+        st.stop()
 
     # ---------------- 装備選択フォーム ----------------
     st.subheader("🎯 最終目標の装備")
