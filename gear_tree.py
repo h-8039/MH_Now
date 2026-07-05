@@ -39,6 +39,7 @@ SLOTS = ["頭", "胴", "腕", "腰", "脚"]
 DEFAULT_LOADOUT = ["吼剣【地咬】", "オーグヘルム", "ウルクメイル",
                    "レイアアーム", "レックスロアコイル", "レックスロアグリーヴ"]
 MAX_DEPTH = 6
+SAME_RANK_STAR = 4  # この討伐難易度以下は同格の装備でも討伐可能とみなす
 
 
 class GearTree:
@@ -100,11 +101,16 @@ class GearTree:
         return bool(self.eq_materials.get(eq_name)) or bool(eq.get("monster"))
 
     def craftable_before(self, eq_name, star):
-        """その装備が「min_star < star のモンスター素材だけ」で作れるか。
+        """その装備の素材が討伐対象より先に集められるか。
+
+        素材元モンスターが「min_star < star」なら討伐対象より易しいので可。
+        ★SAME_RANK_STAR(4)以下のモンスターは同格の装備でも討伐可能と
+        みなすため、討伐対象と同格以上でも素材元として認める。
         素材情報の無い装備は難易度を検証できないため候補から外す。"""
         if not self.has_source_info(eq_name):
             return False
-        return all(self.min_star(m) < star for m in self.monsters_for(eq_name))
+        return all(self.min_star(m) < star or self.min_star(m) <= SAME_RANK_STAR
+                   for m in self.monsters_for(eq_name))
 
     def eval_set(self, ev, gear):
         """セット全体（武器＋防具）のダメージ期待値。"""
@@ -239,6 +245,7 @@ class GearTree:
         need = set()
         for eq in gear:
             need |= self.monsters_for(eq["name"])
+        need.discard(mon)  # 同格緩和による自己参照（自身の素材に自身）は表示しない
         for m in sorted(need, key=self.min_star):
             self.expand_monster(m, indent + 1, depth + 1, buf)
 
@@ -297,8 +304,10 @@ class GearTree:
             for gname in key:
                 need |= self.monsters_for(gname)
             self.set_mats[key] = need
+            # ★SAME_RANK_STAR以下は同格装備で討伐可能なため作成順を拘束しない
             deps[key] = {self.mon_set[m] for m in need
-                         if m in self.mon_set and self.mon_set[m] != key}
+                         if m in self.mon_set and self.mon_set[m] != key
+                         and self.min_star(m) > SAME_RANK_STAR}
         order = []
         remaining = set(deps)
         while remaining:
@@ -344,8 +353,7 @@ class GearTree:
                           + "（そのまま討伐）")
             if s["reds"]:
                 md.append("   - 素材集め: 🔴 " + "、".join(
-                    f"{m}（セット{n}で討伐）" if n else f"{m}（⚠汎用装備で挑戦）"
-                    for m, n in s["reds"]))
+                    self.red_note(m, n, s["no"]) for m, n in s["reds"]))
             md.append("   - ⚔ **このセットで討伐 → " + "、".join(
                 f"{m}（{self.mon_stars(m)}）" for m in s["targets"]) + "**")
         md.append(f"{len(steps) + 1}. **🎯 目標装備を製作: {'、'.join(loadout)}**")
@@ -355,11 +363,22 @@ class GearTree:
                 if self.min_star(m) <= self.max_star:
                     goal_mats.append(f"🟢 {m}")
                 else:
-                    n = self.set_no.get(self.mon_set.get(m))
-                    goal_mats.append(f"{m}（セット{n}で討伐済み）" if n else f"{m}（⚠）")
+                    goal_mats.append(self.red_note(m, self.set_no.get(
+                        self.mon_set.get(m)), len(steps) + 1))
         if goal_mats:
             md.append("   - 素材: " + "、".join(dict.fromkeys(goal_mats)))
         self.flow_md = md
+
+    def red_note(self, m, n, cur_no):
+        """赤モンスターの入手手段注記。作成順より前のセットがあればそれを案内し、
+        無くても★SAME_RANK_STAR以下なら同格装備での討伐可とする。"""
+        if n and n < cur_no:
+            return f"{m}（セット{n}で討伐）"
+        if self.min_star(m) <= SAME_RANK_STAR:
+            return f"{m}（同格装備で討伐可）"
+        if n:
+            return f"{m}（セット{n}で討伐）"
+        return f"{m}（⚠汎用装備で挑戦）"
         self.lines.append("")
         self.lines.extend(s.replace("**", "") for s in md)
 
@@ -386,8 +405,13 @@ class GearTree:
             if s["greens"]:
                 lab.append("素材: " + clip(s["greens"]))
             if s["reds"]:
-                lab.append("要: " + clip(
-                    [f"{m}(セット{n})" if n else f"{m}(⚠)" for m, n in s["reds"]]))
+                def short(m, n):
+                    if n and n < s["no"]:
+                        return f"{m}(セット{n})"
+                    if self.min_star(m) <= SAME_RANK_STAR:
+                        return f"{m}(同格可)"
+                    return f"{m}(セット{n})" if n else f"{m}(⚠)"
+                lab.append("要: " + clip([short(m, n) for m, n in s["reds"]]))
             label = "\\n".join(esc(x) for x in lab)
             d.append(f'  {sid} [label="{label}"];')
             tgt = clip([f"{m}（{self.mon_stars(m)}）" for m in s["targets"]], 3)
