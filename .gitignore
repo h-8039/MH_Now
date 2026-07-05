@@ -1,0 +1,10 @@
+# 認証情報・ブラウザセッション（絶対にコミットしない）
+login.json
+browser_profile/
+
+# 仮想環境・生成物
+.venv/
+output/
+raw_pages/html/
+data/mhnow.db
+__pycache__/

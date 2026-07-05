@@ -1,0 +1,590 @@
+{
+ "ドスジャグラス": {
+  "weakness": [
+   "火",
+   "毒",
+   "睡眠",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415443",
+  "stars": "★1〜★10",
+  "min_star": 1
+ },
+ "クルルヤック": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415442",
+  "stars": "★1〜★10",
+  "min_star": 1
+ },
+ "プケプケ": {
+  "weakness": [
+   "雷",
+   "睡眠"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415441",
+  "stars": "★1〜★10",
+  "min_star": 1
+ },
+ "プケプケ亜種": {
+  "weakness": [
+   "氷",
+   "毒"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/441354",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ボルボロス": {
+  "weakness": [
+   "火",
+   "毒",
+   "爆破",
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415440",
+  "stars": "★1〜★10",
+  "min_star": 1
+ },
+ "ドスギルオス": {
+  "weakness": [
+   "水",
+   "睡眠"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415439",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "トビカガチ": {
+  "weakness": [
+   "水",
+   "毒"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415438",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "トビカガチ亜種": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/551073",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "パオウルムー": {
+  "weakness": [
+   "火",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415437",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "パオウルムー亜種": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/455589",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ジュラトドス": {
+  "weakness": [
+   "雷",
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415436",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "アンジャナフ": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415435",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "アンジャナフ亜種": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/513356",
+  "stars": "★1〜★10",
+  "min_star": 1
+ },
+ "リオレイア": {
+  "weakness": [
+   "雷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415434",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "リオレイア亜種": {
+  "weakness": [
+   "雷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/420453",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "リオレイア希少種": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/465273",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "レイギエナ": {
+  "weakness": [
+   "火",
+   "毒"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415433",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ディアブロス": {
+  "weakness": [
+   "氷",
+   "龍",
+   "麻痺"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415432",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ディアブロス亜種": {
+  "weakness": [
+   "氷",
+   "麻痺"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/419182",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "リオレウス": {
+  "weakness": [
+   "雷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/415431",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "リオレウス亜種": {
+  "weakness": [
+   "氷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/432084",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "リオレウス希少種": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/465274",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ラドバルキン": {
+  "weakness": [
+   "氷",
+   "龍",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/427492",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "バフバロ": {
+  "weakness": [
+   "火",
+   "龍",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/427491",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "ベリオロス": {
+  "weakness": [
+   "火"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/426766",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ジンオウガ": {
+  "weakness": [
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/419063",
+  "stars": "★5〜★10",
+  "min_star": 5
+},
+ "ジンオウガ亜種": {
+  "weakness": [
+   "雷",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/563827",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ツィツィヤック": {
+  "weakness": [
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/440002",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "オドガロン": {
+  "weakness": [
+   "氷",
+   "麻痺"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/440003",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "オドガロン亜種": {
+  "weakness": [
+   "水",
+   "毒",
+   "麻痺"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/492926",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "イビルジョー": {
+  "weakness": [
+   "雷",
+   "龍",
+   "毒"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/440004",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "バサルモス": {
+  "weakness": [
+   "水",
+   "龍",
+   "毒",
+   "睡眠"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/452406",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "フルフル": {
+  "weakness": [
+   "火",
+   "毒"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/452405",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "クシャルダオラ": {
+  "weakness": [
+   "雷",
+   "龍",
+   "毒",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/452407",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "タマミツネ": {
+  "weakness": [
+   "雷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/455588",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "テオ・テスカトル": {
+  "weakness": [
+   "水",
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/460363",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "アケノシルム": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/463378",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "ラージャン": {
+  "weakness": [
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/463380",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "マガイマガド": {
+  "weakness": [
+   "水",
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/463379",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ネルギガンテ": {
+  "weakness": [
+   "雷",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/465272",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "ウルクスス": {
+  "weakness": [
+   "火",
+   "毒",
+   "麻痺",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/477741",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "ラングロトラ": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/477742",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "イソネミクニ": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/477743",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ティガレックス": {
+  "weakness": [
+   "雷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/477744",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ティガレックス亜種": {
+  "weakness": [
+   "水",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/521134",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "キリン": {
+  "weakness": [
+   "火",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/481529",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "バゼルギウス": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/483016",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "チャタカブラ": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/483912",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "アオアシラ": {
+  "weakness": [
+   "火",
+   "毒",
+   "麻痺",
+   "睡眠"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/485349",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "ディノバルド": {
+  "weakness": [
+   "水",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/485350",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "オオナズチ": {
+  "weakness": [
+   "火",
+   "龍",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/496532",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "ドスフロギィ": {
+  "weakness": [
+   "氷",
+   "麻痺",
+   "睡眠"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/502131",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "ビシュテンゴ": {
+  "weakness": [
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/502134",
+  "stars": "★3〜★10",
+  "min_star": 3
+ },
+ "ブラントドス": {
+  "weakness": [
+   "火",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/502137",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ナルガクルガ": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/498978",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ネロミェール": {
+  "weakness": [
+   "火",
+   "龍",
+   "毒",
+   "爆破"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/503792",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "ルナガロン": {
+  "weakness": [
+   "火"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/517668",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ガランゴルム": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/517671",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "エスピナス": {
+  "weakness": [
+   "氷",
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/517674",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "メル・ゼナ": {
+  "weakness": [
+   "龍"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/524395",
+  "stars": "★6〜★10",
+  "min_star": 6
+ },
+ "ケマトリス": {
+  "weakness": [
+   "水"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/540601",
+  "stars": "★2〜★10",
+  "min_star": 2
+ },
+ "ゴシャハギ": {
+  "weakness": [
+   "火"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/540600",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "ライゼクス": {
+  "weakness": [
+   "氷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/540623",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "オロミドロ": {
+  "weakness": [
+   "火"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/551071",
+  "stars": "★4〜★10",
+  "min_star": 4
+ },
+ "セルレギオス": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/551009",
+  "stars": "★5〜★10",
+  "min_star": 5
+ },
+ "ショウグンギザミ": {
+  "weakness": [
+   "雷"
+  ],
+  "url": "https://gamewith.jp/monsterhunternow/article/show/563828",
+  "stars": "★4〜★10",
+  "min_star": 4
+ }
+}
