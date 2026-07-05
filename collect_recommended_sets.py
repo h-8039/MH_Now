@@ -75,10 +75,19 @@ def parse_sets(html, fixed_wtype=None):
     heads = [(m.start(), m.group(1), strip_tags(m.group(2)))
              for m in re.finditer(r"<h([23])[^>]*>(.*?)</h\1>", html, re.S)]
     wtype = fixed_wtype
+    grade = "最強"
     for i, (pos, level, title) in enumerate(heads):
-        if level == "2" and not fixed_wtype:
-            wtype = next((w for w in WEAPON_TYPES
-                          if title.startswith(w + "の")), None)
+        if level == "2":
+            # h2は「おすすめ最強装備」「中級者向け構築」「初心者向け構築」等の分類
+            if "初心者" in title:
+                grade = "初心者"
+            elif "中級者" in title:
+                grade = "中級者"
+            else:
+                grade = "最強"
+            if not fixed_wtype:
+                wtype = next((w for w in WEAPON_TYPES
+                              if title.startswith(w + "の")), None)
             continue
         if level != "3" or not wtype:
             continue
@@ -98,7 +107,7 @@ def parse_sets(html, fixed_wtype=None):
                 armor[slot] = first_name(am.group(1))
         if len(armor) == 5 and weapon:
             armor = {sl: NAME_MAP.get(n, n) for sl, n in armor.items()}
-            sets.append({"weapon_type": wtype, "title": title,
+            sets.append({"weapon_type": wtype, "title": title, "grade": grade,
                          "weapon": NAME_MAP.get(weapon, weapon),
                          "armor": armor})
     return sets

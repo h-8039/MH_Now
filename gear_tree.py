@@ -64,6 +64,7 @@ class GearTree:
                          if REC_FILE.exists() else [])
         self.effects = load_skill_effects()
         self.visited = {}   # モンスター名 → 展開済みか
+        self.beginner_key = None  # 初心者向け構築のセットkey（★6以上の討伐が必要な時に登録）
         self.lines = []     # 出力バッファ（コンソール用テキスト）
         self.md = []        # 出力バッファ（Markdown全体・ファイル/DL用）
         self.sets = {}      # 装備セット(タプル) → {"gear": [...], "targets": [モンスター...]}
@@ -176,10 +177,10 @@ class GearTree:
                 continue
             gear = self.usable_recommended(rs, star)
             if gear:
-                cands.append((self.eval_set(ev, gear), gear, rs["title"]))
+                cands.append((self.eval_set(ev, gear), gear, rs))
         if cands:
-            _, gear, title = max(cands, key=lambda c: c[0])
-            return gear, title
+            _, gear, rs = max(cands, key=lambda c: c[0])
+            return gear, rs
 
         # フォールバック: 条件に合う標準セットが無い場合のみ自動選定
         weapon = self.auto_weapon(star, ev)
@@ -193,6 +194,29 @@ class GearTree:
                     weapon["skills"], best["skills"]))[0] > base:
                 chosen.append(best)
         return chosen, None
+
+    def ensure_beginner_set(self):
+        """★6以上の討伐が必要になったら、記事で「初心者向け構築」に分類された
+        セットを最初に作るセットとして登録する（★5以下の素材集めに使用）。"""
+        if self.beginner_key:
+            return
+        for rs in self.rec_sets:
+            if rs.get("grade") != "初心者":
+                continue
+            if self.weapon_type and rs["weapon_type"] != self.weapon_type:
+                continue
+            gear = self.usable_recommended(rs, SAME_RANK_STAR + 1)
+            if not gear:
+                continue
+            key = tuple(g["name"] for g in gear)
+            self.beginner_key = key
+            if key not in self.set_no:
+                self.set_no[key] = len(self.set_no) + 1
+            entry = self.sets.setdefault(
+                key, {"gear": gear, "targets": [], "base": rs["title"],
+                      "grade": rs.get("grade")})
+            entry["beginner"] = True
+            return
 
     # ---------------------------------------------------- ③ 再帰でツリー ---
 
@@ -220,20 +244,25 @@ class GearTree:
         if depth >= MAX_DEPTH:
             self.emit(buf, indent, f"🔴 {mon}（{stars_s}）…（深さ上限）")
             return
+        if star > SAME_RANK_STAR:
+            # ★6以上の討伐が必要 → 初心者向け構築を先に作るセットとして登録
+            self.ensure_beginner_set()
         res = self.select_set(mon)
         if not res:
             self.emit(buf, indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）"
                                    f"→ ⚠ ★{star}未満の素材で作れる適合武器なし"
                                    f"（汎用素材装備で挑戦）")
             return
-        gear, base_title = res
+        gear, rs = res
         # 装備セットを登録（初出時にセット番号を採番。同一セットは討伐対象を追記）
         key = tuple(g["name"] for g in gear)
         first = key not in self.set_no
         if first:
             self.set_no[key] = len(self.set_no) + 1
-        entry = self.sets.setdefault(key, {"gear": gear, "targets": [],
-                                           "base": base_title})
+        entry = self.sets.setdefault(
+            key, {"gear": gear, "targets": [],
+                  "base": rs["title"] if rs else None,
+                  "grade": rs.get("grade") if rs else None})
         entry["targets"].append(mon)
         label = self.set_label(key)
         if not first:
@@ -308,6 +337,9 @@ class GearTree:
             deps[key] = {self.mon_set[m] for m in need
                          if m in self.mon_set and self.mon_set[m] != key
                          and self.min_star(m) > SAME_RANK_STAR}
+            # 初心者向け構築は他の全セットより先に作る
+            if self.beginner_key and key != self.beginner_key:
+                deps[key].add(self.beginner_key)
         order = []
         remaining = set(deps)
         while remaining:
@@ -342,6 +374,7 @@ class GearTree:
                 "greens": greens,
                 "reds": [(m, self.set_no.get(self.mon_set.get(m))) for m in reds],
                 "targets": self.sets[k]["targets"],
+                "beginner": self.sets[k].get("beginner", False),
             })
         self.flow_steps = steps
 
@@ -354,8 +387,10 @@ class GearTree:
             if s["reds"]:
                 md.append("   - 素材集め: 🔴 " + "、".join(
                     self.red_note(m, n, s["no"]) for m, n in s["reds"]))
-            md.append("   - ⚔ **このセットで討伐 → " + "、".join(
-                f"{m}（{self.mon_stars(m)}）" for m in s["targets"]) + "**")
+            tgt = "、".join(f"{m}（{self.mon_stars(m)}）" for m in s["targets"])
+            if not tgt:
+                tgt = f"★{SAME_RANK_STAR}以下のモンスター全般（素材集め用）"
+            md.append("   - ⚔ **このセットで討伐 → " + tgt + "**")
         md.append(f"{len(steps) + 1}. **🎯 目標装備を製作: {'、'.join(loadout)}**")
         goal_mats = []
         for name in loadout:
@@ -371,10 +406,13 @@ class GearTree:
 
     def red_note(self, m, n, cur_no):
         """赤モンスターの入手手段注記。作成順より前のセットがあればそれを案内し、
-        無くても★SAME_RANK_STAR以下なら同格装備での討伐可とする。"""
+        ★SAME_RANK_STAR以下は初心者向け構築（あれば）または同格装備で討伐可とする。"""
         if n and n < cur_no:
             return f"{m}（セット{n}で討伐）"
         if self.min_star(m) <= SAME_RANK_STAR:
+            b = self.set_no.get(self.beginner_key) if self.beginner_key else None
+            if b and b < cur_no:
+                return f"{m}（セット{b}で討伐可）"
             return f"{m}（同格装備で討伐可）"
         if n:
             return f"{m}（セット{n}で討伐）"
@@ -409,12 +447,17 @@ class GearTree:
                     if n and n < s["no"]:
                         return f"{m}(セット{n})"
                     if self.min_star(m) <= SAME_RANK_STAR:
+                        b = (self.set_no.get(self.beginner_key)
+                             if self.beginner_key else None)
+                        if b and b < s["no"]:
+                            return f"{m}(セット{b})"
                         return f"{m}(同格可)"
                     return f"{m}(セット{n})" if n else f"{m}(⚠)"
                 lab.append("要: " + clip([short(m, n) for m, n in s["reds"]]))
             label = "\\n".join(esc(x) for x in lab)
             d.append(f'  {sid} [label="{label}"];')
-            tgt = clip([f"{m}（{self.mon_stars(m)}）" for m in s["targets"]], 3)
+            tgt = (clip([f"{m}（{self.mon_stars(m)}）" for m in s["targets"]], 3)
+                   or f"★{SAME_RANK_STAR}以下の素材集め")
             d.append(f'  {kid} [shape=ellipse, fillcolor="#fee2e2", '
                      f'label="{esc("討伐: " + tgt)}"];')
             d.append(f"  {prev} -> {sid} -> {kid};")
@@ -432,8 +475,13 @@ class GearTree:
         for key, entry in ordered:
             targets = "、".join(
                 f"{m}（{self.monsters[m].get('stars', '★?')}）" for m in entry["targets"])
-            src = (f"標準セット: {entry['base']}" if entry.get("base")
-                   else "自動選定")
+            if not targets:
+                targets = f"★{SAME_RANK_STAR}以下のモンスター討伐・素材集め用"
+            src = "自動選定"
+            if entry.get("base"):
+                src = f"標準セット: {entry['base']}"
+                if entry.get("grade") and entry["grade"] != "最強":
+                    src += f"〔{entry['grade']}向け構築〕"
             out.append(f"- **{self.set_label(key)}**【{src}】 討伐対象 → {targets}")
             for eq in entry["gear"]:
                 slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
