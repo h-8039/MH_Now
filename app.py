@@ -97,35 +97,38 @@ def main():
         st.stop()
 
     # ---------------- 装備選択フォーム ----------------
-    st.subheader("🎯 最終目標の装備")
+    st.subheader("🎯 最終目標の装備（1つ選択）")
 
-    default_wtype = "片手剣" if "片手剣" in wtypes else wtypes[0]
-    wtype = st.selectbox("武器種", wtypes, index=wtypes.index(default_wtype))
-    wlist = weapons[wtype]
-    w_default = DEFAULT_LOADOUT["武器"] if DEFAULT_LOADOUT["武器"] in wlist else wlist[0]
-    weapon = st.selectbox("武器", wlist, index=wlist.index(w_default))
+    category = st.radio("カテゴリ", ["武器", "防具"], horizontal=True)
 
-    cols = st.columns(2)
-    armor_sel = {}
-    for i, slot in enumerate(SLOTS):
-        alist = armors.get(slot, [])
-        default = DEFAULT_LOADOUT[slot] if DEFAULT_LOADOUT[slot] in alist else alist[0]
-        with cols[i % 2]:
-            armor_sel[slot] = st.selectbox(
-                f"{slot}防具", alist, index=alist.index(default))
+    if category == "武器":
+        default_wtype = "片手剣" if "片手剣" in wtypes else wtypes[0]
+        wtype = st.selectbox("武器種", wtypes, index=wtypes.index(default_wtype))
+        ilist = weapons[wtype]
+        default = DEFAULT_LOADOUT["武器"] if DEFAULT_LOADOUT["武器"] in ilist else ilist[0]
+        target = st.selectbox("武器", ilist, index=ilist.index(default))
+        target_wtype = wtype
+    else:
+        slot = st.selectbox("部位", SLOTS)
+        ilist = armors.get(slot, [])
+        default = DEFAULT_LOADOUT[slot] if DEFAULT_LOADOUT[slot] in ilist else ilist[0]
+        target = st.selectbox("防具", ilist, index=ilist.index(default))
+        target_wtype = None
 
     with st.expander("詳細設定"):
         max_star = st.slider("この討伐難易度(★)以下は「そのまま狩れる」とみなす",
                              1, 6, 3)
+        wtype_options = (["目標武器と同じ"] if target_wtype else []) + wtypes
         tree_wtype = st.selectbox(
-            "対策装備の武器種（途中で作るつなぎ武器）",
-            ["目標武器と同じ"] + wtypes)
+            "対策装備の武器種（途中で作るつなぎ武器）", wtype_options,
+            index=0 if target_wtype else wtype_options.index(
+                "片手剣" if "片手剣" in wtypes else wtypes[0]))
 
     # ---------------- 実行 ----------------
     if st.button("🌲 準備ツリーを生成", type="primary", use_container_width=True):
         from gear_tree import GearTree
-        sel_wtype = wtype if tree_wtype == "目標武器と同じ" else tree_wtype
-        loadout = [weapon] + [armor_sel[s] for s in SLOTS]
+        sel_wtype = target_wtype if tree_wtype == "目標武器と同じ" else tree_wtype
+        loadout = [target]
         with st.spinner("ツリーを計算中…"):
             tree = GearTree(max_star, sel_wtype)
             tree.run(loadout)
