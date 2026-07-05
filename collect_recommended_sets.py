@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
-"""GameWith「最強装備・おすすめ装備まとめ」(記事414964) から推奨装備セットを収集する。
+"""GameWithの最強装備記事から推奨装備セットを収集する。
 
-武器種ごとに掲載されている「おすすめ武器＋防具5部位」のセットを抽出し、
+対象:
+  - まとめ記事414964（全武器種の代表セット）
+  - 武器種別の最強装備記事（汎用装備・作りやすい装備などを含む）
+「おすすめ武器＋防具5部位」のセットを抽出し、重複を除いて
 data/recommended_sets.json に保存する。gear_tree.py が対策装備セットの
 基本形として使用する。
 
@@ -14,13 +17,20 @@ import json
 import re
 import sqlite3
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 OUT_FILE = BASE_DIR / "data" / "recommended_sets.json"
 DB_FILE = BASE_DIR / "data" / "mhnow.db"
-URL = "https://gamewith.jp/monsterhunternow/article/show/414964"
+URL_FMT = "https://gamewith.jp/monsterhunternow/article/show/{}"
+SUMMARY_ID = 414964          # 全武器種まとめ（h2=武器種）
+TYPE_ARTICLE_IDS = [         # 武器種別記事（武器種はタイトルから判定）
+    415957, 429284, 415960, 415962, 415961, 429285,
+    453466, 477863, 439990, 415964, 439991, 415963,
+]
+FETCH_INTERVAL = 4           # アクセスマナー（秒）
 
 SLOTS = ["頭", "胴", "腕", "腰", "脚"]
 WEAPON_TYPES = ["片手剣", "双剣", "大剣", "太刀", "ハンマー", "狩猟笛",
@@ -54,15 +64,19 @@ NAME_MAP = {
 }
 
 
-def parse_sets(html):
-    """h2(武器種) → h3(セット) の順に走査してセットを抽出する。"""
+def parse_sets(html, fixed_wtype=None):
+    """h3(セット)ブロックを走査してセットを抽出する。
+
+    fixed_wtype があれば全ブロックをその武器種として扱い（武器種別記事）、
+    無ければ h2 見出しから武器種を判定する（まとめ記事414964）。
+    """
     sets = []
     # h2/h3の位置を列挙して区間を切る
     heads = [(m.start(), m.group(1), strip_tags(m.group(2)))
              for m in re.finditer(r"<h([23])[^>]*>(.*?)</h\1>", html, re.S)]
-    wtype = None
+    wtype = fixed_wtype
     for i, (pos, level, title) in enumerate(heads):
-        if level == "2":
+        if level == "2" and not fixed_wtype:
             wtype = next((w for w in WEAPON_TYPES
                           if title.startswith(w + "の")), None)
             continue
@@ -106,9 +120,31 @@ def validate(sets):
 
 
 def main():
-    html = fetch(URL)
-    sets = parse_sets(html)
-    print(f"抽出: {len(sets)}セット")
+    sets = parse_sets(fetch(URL_FMT.format(SUMMARY_ID)))
+    print(f"まとめ記事{SUMMARY_ID}: {len(sets)}セット")
+
+    for aid in TYPE_ARTICLE_IDS:
+        time.sleep(FETCH_INTERVAL)
+        html = fetch(URL_FMT.format(aid))
+        tm = re.search(r"【モンハンナウ】(.+?)の最強装備", html)
+        wtype = tm.group(1) if tm and tm.group(1) in WEAPON_TYPES else None
+        if not wtype:
+            print(f"⚠ 記事{aid}: 武器種をタイトルから判定できずスキップ")
+            continue
+        add = parse_sets(html, fixed_wtype=wtype)
+        print(f"記事{aid}（{wtype}）: {len(add)}セット")
+        sets.extend(add)
+
+    # 重複除去（同一の武器＋防具構成は先勝ち）
+    seen, uniq = set(), []
+    for s in sets:
+        key = (s["weapon"], tuple(s["armor"].get(sl) for sl in SLOTS))
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(s)
+    sets = uniq
+    print(f"\n重複除去後: {len(sets)}セット")
     for s in sets:
         print(f"  [{s['weapon_type']}] {s['title']}: {s['weapon']} / "
               + "、".join(s["armor"][sl] for sl in SLOTS))

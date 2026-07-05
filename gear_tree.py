@@ -182,7 +182,11 @@ class GearTree:
             if gear:
                 cands.append((self.eval_set(ev, gear), gear, rs["title"], subs))
         if cands:
-            _, gear, title, subs = max(cands, key=lambda c: c[0])
+            # 期待値がほぼ同等（最大値の95%以上）なら記事由来の部位が多い方を優先
+            best_ev = max(c[0] for c in cands)
+            _, gear, title, subs = max(
+                (c for c in cands if c[0] >= best_ev * 0.95),
+                key=lambda c: (len(c[1]) - len(c[3]), c[0]))
             # 記事由来の部位が少ない（ほぼ代替）場合はベース表記しない
             if len(gear) - len(subs) < 3:
                 title = None
