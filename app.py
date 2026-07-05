@@ -125,7 +125,7 @@ def main():
                 "片手剣" if "片手剣" in wtypes else wtypes[0]))
 
     # ---------------- 実行 ----------------
-    if st.button("🌲 準備ツリーを生成", type="primary", use_container_width=True):
+    if st.button("🌲 準備ツリーを生成", type="primary", width="stretch"):
         from gear_tree import GearTree
         sel_wtype = target_wtype if tree_wtype == "目標武器と同じ" else tree_wtype
         loadout = [target]
@@ -135,6 +135,8 @@ def main():
         # 折りたたみ操作等の再実行でツリーが消えないよう結果を保持する
         st.session_state["tree_result"] = {
             "sections": tree.sections,
+            "flow_dot": tree.flow_dot,
+            "flow_md": "\n".join(tree.flow_md),
             "set_md": "\n".join(tree.set_md),
             "full_md": "\n".join(tree.md),
             "max_star": max_star,
@@ -142,21 +144,26 @@ def main():
 
     result = st.session_state.get("tree_result")
     if result:
-        st.subheader("📋 準備ツリー（製作しやすい順）")
-        st.caption("🎯目標装備 ⚒対策装備セット 🔴要対策モンスター "
-                   f"🟢★{result['max_star']}以下（そのまま狩れる） 🔁前述 "
-                   "／ セットの内容は下の一覧を参照")
-        for sec in result["sections"]:
-            with st.expander(sec["title"]):
-                st.markdown("\n".join(sec["md"]))
+        st.subheader("🧭 討伐フローチャート")
+        st.caption("上から順に「セットを作成 → そのセットで討伐 → 次へ」。"
+                   f"🟢は★{result['max_star']}以下でそのまま狩れるモンスター。"
+                   "各セットの装備内容は下の一覧を参照。")
+        st.graphviz_chart(result["flow_dot"], width="stretch")
 
-        st.markdown(result["set_md"])
+        with st.expander("🧾 フローを文字で見る"):
+            st.markdown(result["flow_md"])
+        with st.expander("📦 装備セット一覧（各セットの内容）"):
+            st.markdown(result["set_md"])
+        with st.expander("🌲 詳細ツリー（どの素材モンスターが必要か）"):
+            for sec in result["sections"]:
+                st.markdown("**" + sec["title"] + "**")
+                st.markdown("\n".join(sec["md"]))
 
         st.download_button("Markdownをダウンロード",
                            data=result["full_md"],
                            file_name="gear_tree.md",
                            mime="text/markdown",
-                           use_container_width=True)
+                           width="stretch")
 
     st.divider()
     st.caption("データ出典: GameWith / アルテマ / game8（個人利用の攻略支援ツール）")

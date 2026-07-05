@@ -21,6 +21,7 @@
 import argparse
 import io
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -208,9 +209,139 @@ class GearTree:
             if not buf:
                 self.emit(buf, 1, "（必要モンスター情報なし）")
             self.sections.append({"title": title, "md": buf})
+        self.compute_flow()
+        self.build_flow(loadout)
+        self.build_flow_dot(loadout)
         self.build_set_list(loadout)
         self.build_md(loadout)
         return all_targets
+
+    # ---------------------------------------------- ④ 討伐フローチャート ---
+
+    def mon_stars(self, m):
+        return self.monsters.get(m, {}).get("stars", "★?")
+
+    def compute_flow(self):
+        """セット間の依存関係（素材モンスター→討伐セット）から作成順を求め、
+        セット番号を作成順に振り直す。
+
+        DFS展開の登場順では「後のセットが先のセットの素材討伐に必要」という
+        逆転が起こり得るため、トポロジカルソートで実際に作れる順に並べる。
+        """
+        self.mon_set = {}   # 赤モンスター → 討伐に使うセットkey
+        for key, e in self.sets.items():
+            for m in e["targets"]:
+                self.mon_set[m] = key
+        self.set_mats = {}  # セットkey → 素材モンスター集合
+        deps = {}
+        for key in self.sets:
+            need = set()
+            for gname in key:
+                need |= self.monsters_for(gname)
+            self.set_mats[key] = need
+            deps[key] = {self.mon_set[m] for m in need
+                         if m in self.mon_set and self.mon_set[m] != key}
+        order = []
+        remaining = set(deps)
+        while remaining:
+            ready = sorted((k for k in remaining if not (deps[k] & remaining)),
+                           key=lambda k: self.set_no[k])
+            if not ready:   # 想定外の循環時は登場順で1つずつ取り出す
+                ready = [min(remaining, key=lambda k: self.set_no[k])]
+            for k in ready:
+                order.append(k)
+                remaining.discard(k)
+        # ツリー本文中の「セットN」表記も新番号に書き換える
+        renum = {self.set_no[k]: i + 1 for i, k in enumerate(order)}
+        pat = re.compile(r"セット(\d+)")
+        fix = lambda s: pat.sub(lambda m: f"セット{renum[int(m.group(1))]}", s)
+        self.lines = [fix(s) for s in self.lines]
+        for sec in self.sections:
+            sec["md"] = [fix(s) for s in sec["md"]]
+        self.set_no = {k: i + 1 for i, k in enumerate(order)}
+        self.set_order = order
+
+    def build_flow(self, loadout):
+        """作成順に「セット作成→討伐」を並べたフロー（Markdown＋手順データ）。"""
+        steps = []
+        for k in self.set_order:
+            greens = sorted((m for m in self.set_mats[k]
+                             if self.min_star(m) <= self.max_star), key=self.min_star)
+            reds = sorted((m for m in self.set_mats[k]
+                           if self.min_star(m) > self.max_star), key=self.min_star)
+            steps.append({
+                "no": self.set_no[k],
+                "label": self.set_label(k),
+                "greens": greens,
+                "reds": [(m, self.set_no.get(self.mon_set.get(m))) for m in reds],
+                "targets": self.sets[k]["targets"],
+            })
+        self.flow_steps = steps
+
+        md = ["### 🧭 討伐フロー（上から順に実行）"]
+        for s in steps:
+            md.append(f"{s['no']}. **⚒ {s['label']}を作成**")
+            if s["greens"]:
+                md.append("   - 素材集め: 🟢 " + "、".join(s["greens"])
+                          + "（そのまま討伐）")
+            if s["reds"]:
+                md.append("   - 素材集め: 🔴 " + "、".join(
+                    f"{m}（セット{n}で討伐）" if n else f"{m}（⚠汎用装備で挑戦）"
+                    for m, n in s["reds"]))
+            md.append("   - ⚔ **このセットで討伐 → " + "、".join(
+                f"{m}（{self.mon_stars(m)}）" for m in s["targets"]) + "**")
+        md.append(f"{len(steps) + 1}. **🎯 目標装備を製作: {'、'.join(loadout)}**")
+        goal_mats = []
+        for name in loadout:
+            for m in sorted(self.monsters_for(name), key=self.min_star):
+                if self.min_star(m) <= self.max_star:
+                    goal_mats.append(f"🟢 {m}")
+                else:
+                    n = self.set_no.get(self.mon_set.get(m))
+                    goal_mats.append(f"{m}（セット{n}で討伐済み）" if n else f"{m}（⚠）")
+        if goal_mats:
+            md.append("   - 素材: " + "、".join(dict.fromkeys(goal_mats)))
+        self.flow_md = md
+        self.lines.append("")
+        self.lines.extend(s.replace("**", "") for s in md)
+
+    def build_flow_dot(self, loadout):
+        """Streamlit の st.graphviz_chart 用の DOT フローチャートを組み立てる。"""
+        def esc(t):
+            return t.replace('"', '\\"')
+
+        def clip(names, n=4):
+            names = list(names)
+            return "、".join(names[:n]) + (f" 他{len(names) - n}体"
+                                           if len(names) > n else "")
+
+        d = ["digraph flow {",
+             "  rankdir=TB;",
+             '  node [fontname="sans-serif", fontsize=12, shape=box, '
+             'style="rounded,filled", fillcolor="#dbeafe", color="#64748b"];',
+             '  edge [color="#64748b"];',
+             '  start [label="スタート（手持ち装備）", fillcolor="#e2e8f0"];']
+        prev = "start"
+        for s in self.flow_steps:
+            sid, kid = f"s{s['no']}", f"k{s['no']}"
+            lab = [f"⚒ {s['label']}を作成"]
+            if s["greens"]:
+                lab.append("素材: " + clip(s["greens"]))
+            if s["reds"]:
+                lab.append("要: " + clip(
+                    [f"{m}(セット{n})" if n else f"{m}(⚠)" for m, n in s["reds"]]))
+            label = "\\n".join(esc(x) for x in lab)
+            d.append(f'  {sid} [label="{label}"];')
+            tgt = clip([f"{m}（{self.mon_stars(m)}）" for m in s["targets"]], 3)
+            d.append(f'  {kid} [shape=ellipse, fillcolor="#fee2e2", '
+                     f'label="{esc("討伐: " + tgt)}"];')
+            d.append(f"  {prev} -> {sid} -> {kid};")
+            prev = kid
+        d.append(f'  goal [fillcolor="#dcfce7", '
+                 f'label="{esc("🎯 " + "、".join(loadout) + " を製作")}"];')
+        d.append(f"  {prev} -> goal;")
+        d.append("}")
+        self.flow_dot = "\n".join(d)
 
     def build_set_list(self, loadout):
         """重複を除いた装備セット一覧（番号順=作成順）をMarkdown行で作る。"""
@@ -243,12 +374,13 @@ class GearTree:
 
     def build_md(self, loadout):
         """ファイル/ダウンロード用のMarkdown全体（<details>折りたたみ付き）を組み立てる。"""
-        md = [f"## 🌲 準備ツリー（製作しやすい順・討伐難易度★{self.max_star}以下まで遡り）", ""]
+        md = list(self.flow_md) + [""]
+        md += self.set_md + [""]
+        md += [f"### 🌲 詳細ツリー（討伐難易度★{self.max_star}以下まで遡り）", ""]
         for sec in self.sections:
             md += ["<details>", f"<summary>{sec['title']}</summary>", ""]
             md += sec["md"]
             md += ["", "</details>", ""]
-        md += self.set_md
         self.md = md
 
 
