@@ -131,44 +131,34 @@ class GearTree:
         return max(pieces, key=lambda p: ev.evaluate(
             weapon, merge_skills(weapon["skills"], p["skills"]))[0])
 
-    def adjust_recommended(self, rs, star, ev):
-        """GameWith推奨セットを基本に、難易度制約で作れない部位だけ代替する。
+    def usable_recommended(self, rs, star):
+        """推奨セットをそのまま使えるか検証し、使えれば装備リストを返す。
 
-        戻り値: (gear, subs) — subs は代替した装備名のリスト。
-        武器がどうしても用意できない場合は (None, None)。
+        全部位がDBに登録されており、かつ討伐難易度の制約
+        （craftable_before）を満たす場合のみ有効。1部位でも欠ければ不可。
         """
-        subs = []
         w = self.equipment.get(rs["weapon"])
         if not (w and w["category"] == "武器" and w["attack"] > 0
                 and self.craftable_before(rs["weapon"], star)):
-            w = self.auto_weapon(star, ev)
-            if not w:
-                return None, None
-            subs.append(w["name"])
+            return None
         gear = [w]
-        base = ev.evaluate(w, dict(w["skills"]))[0]
         for slot in SLOTS:
             name = rs["armor"].get(slot)
             p = self.equipment.get(name)
-            if p and self.craftable_before(name, star):
-                if p["slot"] != slot:  # 禍鎧/ミヅハ等はDB上部位なしのため補完
-                    p = dict(p, slot=slot)
-                gear.append(p)
-                continue
-            alt = self.auto_armor(slot, star, ev, w)
-            if alt and ev.evaluate(w, merge_skills(
-                    w["skills"], alt["skills"]))[0] > base:
-                gear.append(alt)
-                subs.append(alt["name"])
-        return gear, subs
+            if not (p and self.craftable_before(name, star)):
+                return None
+            if p["slot"] != slot:  # 禍鎧/ミヅハ等はDB上部位なしのため補完
+                p = dict(p, slot=slot)
+            gear.append(p)
+        return gear
 
     def select_set(self, mon):
         """モンスター討伐用の武器+防具5部位を選定する。
 
-        GameWith推奨セット（recommended_sets.json）を基本とし、
-        討伐難易度の制約（craftable_before）で作れない装備だけ
-        代替品に置き換える。推奨セットが使えない場合は従来の自動選定。
-        戻り値: (gear, base_title, subs) または None。
+        GameWith推奨セット（recommended_sets.json）を無改変でそのまま使う
+        【標準セット】を優先し、条件（武器種・討伐難易度の制約）に合う
+        セットが1つも無い場合のみ装備を個別に組み合わせる【自動選定】。
+        戻り値: (gear, base_title) — 標準セットなら base_title にセット名。
         """
         star = self.min_star(mon)
         weaknesses = self.monsters[mon]["weakness"]
@@ -178,21 +168,14 @@ class GearTree:
         for rs in self.rec_sets:
             if self.weapon_type and rs["weapon_type"] != self.weapon_type:
                 continue
-            gear, subs = self.adjust_recommended(rs, star, ev)
+            gear = self.usable_recommended(rs, star)
             if gear:
-                cands.append((self.eval_set(ev, gear), gear, rs["title"], subs))
+                cands.append((self.eval_set(ev, gear), gear, rs["title"]))
         if cands:
-            # 期待値がほぼ同等（最大値の95%以上）なら記事由来の部位が多い方を優先
-            best_ev = max(c[0] for c in cands)
-            _, gear, title, subs = max(
-                (c for c in cands if c[0] >= best_ev * 0.95),
-                key=lambda c: (len(c[1]) - len(c[3]), c[0]))
-            # 記事由来の部位が少ない（ほぼ代替）場合はベース表記しない
-            if len(gear) - len(subs) < 3:
-                title = None
-            return gear, title, subs
+            _, gear, title = max(cands, key=lambda c: c[0])
+            return gear, title
 
-        # フォールバック: 従来の自動選定
+        # フォールバック: 条件に合う標準セットが無い場合のみ自動選定
         weapon = self.auto_weapon(star, ev)
         if not weapon:
             return None
@@ -203,7 +186,7 @@ class GearTree:
             if best and ev.evaluate(weapon, merge_skills(
                     weapon["skills"], best["skills"]))[0] > base:
                 chosen.append(best)
-        return chosen, None, []
+        return chosen, None
 
     # ---------------------------------------------------- ③ 再帰でツリー ---
 
@@ -237,14 +220,14 @@ class GearTree:
                                    f"→ ⚠ ★{star}未満の素材で作れる適合武器なし"
                                    f"（汎用素材装備で挑戦）")
             return
-        gear, base_title, subs = res
+        gear, base_title = res
         # 装備セットを登録（初出時にセット番号を採番。同一セットは討伐対象を追記）
         key = tuple(g["name"] for g in gear)
         first = key not in self.set_no
         if first:
             self.set_no[key] = len(self.set_no) + 1
         entry = self.sets.setdefault(key, {"gear": gear, "targets": [],
-                                           "base": base_title, "subs": subs})
+                                           "base": base_title})
         entry["targets"].append(mon)
         label = self.set_label(key)
         if not first:
@@ -425,9 +408,9 @@ class GearTree:
         for key, entry in ordered:
             targets = "、".join(
                 f"{m}（{self.monsters[m].get('stars', '★?')}）" for m in entry["targets"])
-            src = (f"GameWith「{entry['base']}」ベース" if entry.get("base")
+            src = (f"標準セット: {entry['base']}" if entry.get("base")
                    else "自動選定")
-            out.append(f"- **{self.set_label(key)}**（{src}） 討伐対象 → {targets}")
+            out.append(f"- **{self.set_label(key)}**【{src}】 討伐対象 → {targets}")
             for eq in entry["gear"]:
                 slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
                 info = []
@@ -438,9 +421,8 @@ class GearTree:
                 sk = "、".join(f"{k}Lv{v}" for k, v in list(eq["skills"].items())[:3])
                 if sk:
                     info.append(sk)
-                mark = " ※代替" if eq["name"] in entry.get("subs", []) else ""
                 out.append(f"  - 【{slot}】{eq['name']}"
-                           + (f"（{'／'.join(info)}）" if info else "") + mark)
+                           + (f"（{'／'.join(info)}）" if info else ""))
         out.append("- **最終セット（目標装備）**")
         for name in loadout:
             eq = self.equipment[name]
