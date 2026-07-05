@@ -44,12 +44,14 @@ c:\python\MH_now\
 ├── collect_material_sources.py # 素材→入手元モンスター対応表の取得
 ├── collect_game8_materials.py  # 素材欠損装備の補完（game8から収集）
 ├── collect_altema_materials.py # 素材欠損防具の補完（アルテマから収集）
+├── collect_recommended_sets.py # GameWith推奨装備セット（記事414964）の収集
 ├── materials_csv.py       # 素材CSV読み込みモジュール
 ├── login.json.example     # GameWith認証情報のテンプレート（login.jsonは.gitignore対象）
 ├── data\
 │   ├── equipment.json     # フローチャート用メタデータ（モンスター・フェーズ・攻略メモ）
 │   ├── skill_effects.json # 全スキルのレベル別効果（collect_skill_effects.pyで生成）
 │   ├── monsters.json      # 全モンスターの弱点属性（collect_index_data.pyで生成）
+│   ├── recommended_sets.json # GameWith推奨装備セット（collect_recommended_sets.pyで生成）
 │   └── mhnow.db           # SQLiteデータベース（build_db.pyで再構築可能）
 ├── raw_pages\             # 収集データ（CSV）
 │   ├── monsterhunternow_weapon_materials_wide.csv   # 武器の全強化素材（手動入手）

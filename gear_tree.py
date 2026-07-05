@@ -32,6 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_FILE = BASE_DIR / "data" / "mhnow.db"
 MONSTERS_FILE = BASE_DIR / "data" / "monsters.json"
 MAT_SRC_FILE = BASE_DIR / "data" / "material_sources.json"
+REC_FILE = BASE_DIR / "data" / "recommended_sets.json"
 OUT_FILE = BASE_DIR / "output" / "gear_tree.md"
 
 SLOTS = ["頭", "胴", "腕", "腰", "脚"]
@@ -57,6 +58,9 @@ class GearTree:
         conn.close()
         self.monsters = json.loads(MONSTERS_FILE.read_text(encoding="utf-8"))
         self.mat_src = json.loads(MAT_SRC_FILE.read_text(encoding="utf-8"))
+        # GameWith推奨装備セット（collect_recommended_sets.py で収集）
+        self.rec_sets = (json.loads(REC_FILE.read_text(encoding="utf-8"))
+                         if REC_FILE.exists() else [])
         self.effects = load_skill_effects()
         self.visited = {}   # モンスター名 → 展開済みか
         self.lines = []     # 出力バッファ（コンソール用テキスト）
@@ -102,35 +106,100 @@ class GearTree:
             return False
         return all(self.min_star(m) < star for m in self.monsters_for(eq_name))
 
-    def select_set(self, mon):
-        """モンスター討伐用の武器+防具5部位を選定する。"""
-        star = self.min_star(mon)
-        weaknesses = self.monsters[mon]["weakness"]
-        ev = Evaluator(self.effects, weaknesses, optimistic=False)
+    def eval_set(self, ev, gear):
+        """セット全体（武器＋防具）のダメージ期待値。"""
+        skills = dict(gear[0]["skills"])
+        for p in gear[1:]:
+            skills = merge_skills(skills, p["skills"])
+        return ev.evaluate(gear[0], skills)[0]
 
+    def auto_weapon(self, star, ev):
         weapons = [e for e in self.equipment.values()
                    if e["category"] == "武器" and e["attack"] > 0
                    and (not self.weapon_type or e["weapon_type"] == self.weapon_type)
                    and self.craftable_before(e["name"], star)]
         if not weapons:
             return None
-        weapon = max(weapons, key=lambda w: ev.evaluate(w, dict(w["skills"]))[0])
-        base = ev.evaluate(weapon, dict(weapon["skills"]))[0]
+        return max(weapons, key=lambda w: ev.evaluate(w, dict(w["skills"]))[0])
 
+    def auto_armor(self, slot, star, ev, weapon):
+        pieces = [e for e in self.equipment.values()
+                  if e["category"] == "防具" and e["slot"] == slot
+                  and self.craftable_before(e["name"], star)]
+        if not pieces:
+            return None
+        return max(pieces, key=lambda p: ev.evaluate(
+            weapon, merge_skills(weapon["skills"], p["skills"]))[0])
+
+    def adjust_recommended(self, rs, star, ev):
+        """GameWith推奨セットを基本に、難易度制約で作れない部位だけ代替する。
+
+        戻り値: (gear, subs) — subs は代替した装備名のリスト。
+        武器がどうしても用意できない場合は (None, None)。
+        """
+        subs = []
+        w = self.equipment.get(rs["weapon"])
+        if not (w and w["category"] == "武器" and w["attack"] > 0
+                and self.craftable_before(rs["weapon"], star)):
+            w = self.auto_weapon(star, ev)
+            if not w:
+                return None, None
+            subs.append(w["name"])
+        gear = [w]
+        base = ev.evaluate(w, dict(w["skills"]))[0]
+        for slot in SLOTS:
+            name = rs["armor"].get(slot)
+            p = self.equipment.get(name)
+            if p and self.craftable_before(name, star):
+                if p["slot"] != slot:  # 禍鎧/ミヅハ等はDB上部位なしのため補完
+                    p = dict(p, slot=slot)
+                gear.append(p)
+                continue
+            alt = self.auto_armor(slot, star, ev, w)
+            if alt and ev.evaluate(w, merge_skills(
+                    w["skills"], alt["skills"]))[0] > base:
+                gear.append(alt)
+                subs.append(alt["name"])
+        return gear, subs
+
+    def select_set(self, mon):
+        """モンスター討伐用の武器+防具5部位を選定する。
+
+        GameWith推奨セット（recommended_sets.json）を基本とし、
+        討伐難易度の制約（craftable_before）で作れない装備だけ
+        代替品に置き換える。推奨セットが使えない場合は従来の自動選定。
+        戻り値: (gear, base_title, subs) または None。
+        """
+        star = self.min_star(mon)
+        weaknesses = self.monsters[mon]["weakness"]
+        ev = Evaluator(self.effects, weaknesses, optimistic=False)
+
+        cands = []
+        for rs in self.rec_sets:
+            if self.weapon_type and rs["weapon_type"] != self.weapon_type:
+                continue
+            gear, subs = self.adjust_recommended(rs, star, ev)
+            if gear:
+                cands.append((self.eval_set(ev, gear), gear, rs["title"], subs))
+        if cands:
+            _, gear, title, subs = max(cands, key=lambda c: c[0])
+            # 記事由来の部位が少ない（ほぼ代替）場合はベース表記しない
+            if len(gear) - len(subs) < 3:
+                title = None
+            return gear, title, subs
+
+        # フォールバック: 従来の自動選定
+        weapon = self.auto_weapon(star, ev)
+        if not weapon:
+            return None
+        base = ev.evaluate(weapon, dict(weapon["skills"]))[0]
         chosen = [weapon]
         for slot in SLOTS:
-            pieces = [e for e in self.equipment.values()
-                      if e["category"] == "防具" and e["slot"] == slot
-                      and self.craftable_before(e["name"], star)]
-            if not pieces:
-                continue
-            best = max(pieces, key=lambda p: ev.evaluate(
-                weapon, merge_skills(weapon["skills"], p["skills"]))[0])
-            gain = ev.evaluate(weapon,
-                               merge_skills(weapon["skills"], best["skills"]))[0] - base
-            if gain > 0:
+            best = self.auto_armor(slot, star, ev, weapon)
+            if best and ev.evaluate(weapon, merge_skills(
+                    weapon["skills"], best["skills"]))[0] > base:
                 chosen.append(best)
-        return chosen
+        return chosen, None, []
 
     # ---------------------------------------------------- ③ 再帰でツリー ---
 
@@ -158,18 +227,20 @@ class GearTree:
         if depth >= MAX_DEPTH:
             self.emit(buf, indent, f"🔴 {mon}（{stars_s}）…（深さ上限）")
             return
-        gear = self.select_set(mon)
-        if not gear:
+        res = self.select_set(mon)
+        if not res:
             self.emit(buf, indent, f"🔴 {mon}（{stars_s}／弱点:{weak_s}）"
                                    f"→ ⚠ ★{star}未満の素材で作れる適合武器なし"
                                    f"（汎用素材装備で挑戦）")
             return
+        gear, base_title, subs = res
         # 装備セットを登録（初出時にセット番号を採番。同一セットは討伐対象を追記）
         key = tuple(g["name"] for g in gear)
         first = key not in self.set_no
         if first:
             self.set_no[key] = len(self.set_no) + 1
-        entry = self.sets.setdefault(key, {"gear": gear, "targets": []})
+        entry = self.sets.setdefault(key, {"gear": gear, "targets": [],
+                                           "base": base_title, "subs": subs})
         entry["targets"].append(mon)
         label = self.set_label(key)
         if not first:
@@ -350,7 +421,9 @@ class GearTree:
         for key, entry in ordered:
             targets = "、".join(
                 f"{m}（{self.monsters[m].get('stars', '★?')}）" for m in entry["targets"])
-            out.append(f"- **{self.set_label(key)}** 討伐対象 → {targets}")
+            src = (f"GameWith「{entry['base']}」ベース" if entry.get("base")
+                   else "自動選定")
+            out.append(f"- **{self.set_label(key)}**（{src}） 討伐対象 → {targets}")
             for eq in entry["gear"]:
                 slot = eq["weapon_type"] if eq["category"] == "武器" else eq["slot"]
                 info = []
@@ -361,8 +434,9 @@ class GearTree:
                 sk = "、".join(f"{k}Lv{v}" for k, v in list(eq["skills"].items())[:3])
                 if sk:
                     info.append(sk)
+                mark = " ※代替" if eq["name"] in entry.get("subs", []) else ""
                 out.append(f"  - 【{slot}】{eq['name']}"
-                           + (f"（{'／'.join(info)}）" if info else ""))
+                           + (f"（{'／'.join(info)}）" if info else "") + mark)
         out.append("- **最終セット（目標装備）**")
         for name in loadout:
             eq = self.equipment[name]
