@@ -14,7 +14,15 @@
 .venv\Scripts\python -m streamlit run app.py     # ローカル起動
 ```
 
-[app.py](app.py) は装備選択→実行ボタン→準備ツリー表示のStreamlitアプリ。
+[app.py](app.py) は Streamlit 製のWebアプリ。目標装備を1つ選んで実行すると、
+gear_tree.py による討伐フローチャートを表示する。
+
+- 選択は「カテゴリ（武器/防具）→ 武器種/部位 → 装備名」の3段階
+- 結果表示は上から ①🧭討伐フローチャート（Graphviz。セット作成→討伐→次のセットの順路）
+  ②🧾フローの文字版 ③📦装備セット一覧 ④🌲詳細ツリー（②〜④は折りたたみ）
+- 結果は session_state に保持されるため、折りたたみ操作やダウンロードで消えない
+- Markdownダウンロード可（<details>折りたたみ付き）
+
 Streamlit Community Cloud にデプロイするとスマホのブラウザから利用できる。
 
 デプロイ手順:
@@ -31,7 +39,7 @@ data/mhnow.db が無い環境では、アプリが初回起動時にCSVから自
 
 ```
 c:\python\MH_now\
-├── app.py                 # Webアプリ（Streamlit。装備選択→準備ツリー表示）
+├── app.py                 # Webアプリ（Streamlit。装備選択→討伐フローチャート表示）
 ├── requirements.txt       # デプロイ用依存パッケージ
 ├── flowchart.py           # 装備作成フローチャート生成（Mermaid + HTML）
 ├── planner.py             # 攻略プランナーCLI（探索・素材計算・検索）
@@ -44,14 +52,14 @@ c:\python\MH_now\
 ├── collect_material_sources.py # 素材→入手元モンスター対応表の取得
 ├── collect_game8_materials.py  # 素材欠損装備の補完（game8から収集）
 ├── collect_altema_materials.py # 素材欠損防具の補完（アルテマから収集）
-├── collect_recommended_sets.py # GameWith推奨装備セット（記事414964）の収集
+├── collect_recommended_sets.py # GameWith推奨装備セットの収集（まとめ+武器種別13記事）
 ├── materials_csv.py       # 素材CSV読み込みモジュール
 ├── login.json.example     # GameWith認証情報のテンプレート（login.jsonは.gitignore対象）
 ├── data\
 │   ├── equipment.json     # フローチャート用メタデータ（モンスター・フェーズ・攻略メモ）
 │   ├── skill_effects.json # 全スキルのレベル別効果（collect_skill_effects.pyで生成）
 │   ├── monsters.json      # 全モンスターの弱点属性（collect_index_data.pyで生成）
-│   ├── recommended_sets.json # GameWith推奨装備セット（collect_recommended_sets.pyで生成）
+│   ├── recommended_sets.json # GameWith推奨装備セット117件・構築分類付き（collect_recommended_sets.pyで生成）
 │   └── mhnow.db           # SQLiteデータベース（build_db.pyで再構築可能）
 ├── raw_pages\             # 収集データ（CSV）
 │   ├── monsterhunternow_weapon_materials_wide.csv   # 武器の全強化素材（手動入手）
@@ -62,20 +70,22 @@ c:\python\MH_now\
 │   └── equipment_skills.csv    # グレード別スキル（--collectで生成）
 └── output\
     ├── flowchart.md            # Mermaidフローチャート入りMarkdown
-    └── flowchart.html          # ブラウザで開ける自己完結HTML
+    ├── flowchart.html          # ブラウザで開ける自己完結HTML
+    └── gear_tree.md            # 討伐フロー+装備セット一覧+詳細ツリー（gear_tree.pyの出力）
 ```
 
 ---
 
-## データ収録状況（2026-07-05時点）
+## データ収録状況（2026-07-06時点）
 
 | データ | 収録率 | 内容 |
 | --- | --- | --- |
 | 装備 | 1,516件（武器1,176・防具340） | 名称・区分・武器種/シリーズ・部位 |
-| 強化素材 | 52,400ステップ / 166,670素材行 | 生産〜G10 Lv5の全素材・ゼニー実数 |
+| 強化素材 | 51,260ステップ / 167,885素材行 | 生産〜G10 Lv5の全素材・ゼニー実数 |
 | 武器の属性 | 1,176 / 1,176（100%） | 無377・雷171・火156・氷124・水122・龍100・毒75・睡眠30・麻痺21 |
 | グレード別ステータス | 1,516 / 1,516（100%） | 武器=攻撃力・属性値、防具=防御力（各グレードLv1時点の下限値） |
 | スキル | 1,514 / 1,516（99.9%） | 121種類・2,363行。スキルLvごとの解放グレード付き |
+| 推奨装備セット | 117セット（全14武器種） | GameWith最強装備記事13本から収集。構築分類（最強/中級者/初心者）付き |
 
 未収録: 「禍鎧」「ミヅハ」のスキル（5部位同名の特殊装備でページ構造が異なるため）
 
@@ -219,25 +229,46 @@ python optimize.py --element 水 --element 龍 --optimistic --top 5
 スキル効果の元データは `collect_skill_effects.py` がGameWithページ埋め込みの
 tooltipDatas（全150スキルのレベル別効果）から抽出して `data/skill_effects.json` に生成する。
 
-### 装備準備ツリー（gear_tree.py）
+### 装備準備ツリー・討伐フローチャート（gear_tree.py）
 
 「①目標装備の素材モンスター抽出 → ②そのモンスター討伐用の装備セット選定 →
 ③その装備の素材モンスター抽出 → ①へ再帰」を、討伐難易度が `--max-star`（既定★3）
-以下になるまで繰り返し、狩る順序が分かる木構造を出力する。
+以下になるまで繰り返し、討伐フロー・装備セット一覧・詳細ツリーを出力する。
 
 ```
 python gear_tree.py                          # 既定の片手剣無属性最強装備
 python gear_tree.py --max-star 3 --weapon-type 片手剣
+python collect_recommended_sets.py           # 推奨装備セットの再収集（13記事・4秒間隔）
 ```
 
+対策装備セットの選定ルール:
+- **標準セット優先**: GameWithの最強装備記事から収集した117セット
+  （`data/recommended_sets.json`）のうち、武器種が一致し全6部位が素材制約を
+  満たすものを**無改変で**採用し、【標準セット: 名前〔分類〕】と表記する
+- 条件に合う標準セットが無い場合のみ、装備を個別に組み合わせて【自動選定】と表記
+- **同格討伐ルール**: ★5（`SAME_RANK_STAR`）以下のモンスターは同格の装備でも
+  討伐可能とみなし、素材制約・セット作成順を拘束しない。★6以上のみ
+  「先に対策セットを作ってから狩る」順序が強制される
+- **初心者向け構築を最初に**: ★6以上の討伐が必要になった場合、記事で
+  「初心者向け構築(★6討伐まで)」に分類されたセット（作りやすい汎用装備）を
+  セット1として最初に作り、★5以下の素材集めはこのセットで行う
+
+出力とフロー:
+- セット間の素材依存関係をトポロジカルソートし、セット番号を「番号順に作れば
+  必ず素材が揃う」作成順に振り直す
+- 🧭討伐フロー: セット作成→討伐→次のセットの手順（Markdown + Graphviz DOT。
+  DOTは app.py の st.graphviz_chart で図として描画される）
+- 📦装備セット一覧: 重複除去済み。各セットの由来（標準セット/自動選定）と
+  討伐対象を表示
+- 🌲詳細ツリー: どの装備にどのモンスターの素材が必要かの内訳
+  （🎯目標 ⚒対策セット 🔴要対策 🟢そのまま狩れる 🔁前述）
+- 出力: コンソール + output/gear_tree.md（<details>折りたたみ付き）
+
+補足:
 - 素材→入手元は `data/material_sources.json`（`collect_material_sources.py` で生成）
-- 対策装備の候補は「対象モンスターより討伐難易度の低いモンスター素材だけで作れる装備」に
-  限定するため、ツリーは必ず易しい方向へ収束して停止する
 - 複数モンスターから入手できる素材（古龍の血など）は最も難易度の低い1体で集める扱い
-- 素材情報の無い装備は対策候補から除外される
-- ツリー末尾に重複除去済みの「装備セット一覧」を出力（同一セットで狩れる🔴モンスターを集約し、
-  作成順＝討伐対象の難易度が低い順に並ぶ）
-- 出力: コンソール（🎯目標 ⚒対策装備 🔴要対策 🟢そのまま狩れる）+ output/gear_tree.md
+- 素材情報の無い装備・DB未登録の装備（ジャナール防具等4件）は標準セットの採用条件を
+  満たさないため、そのセットは候補から外れる
 
 ### 素材欠損データの補完
 
